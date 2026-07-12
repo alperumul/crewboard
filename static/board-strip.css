@@ -1,0 +1,60 @@
+/* Situation-board strip (S0) — a glanceable live-session board atop the secretary
+   rail: status light + name + the secretary's distilled brief line for each LIVE
+   session. Kept in its own file (not style.css) on purpose: a concurrent session
+   is restyling the rail in style.css, and claude-hub has no git safety net, so
+   this stays clear of that file. Reuses the cream "Drafting Console" tokens +
+   the shared .light-* status dots, so it matches the current rail. Fold into
+   style.css once the rail restyle settles. */
+
+.board-strip {
+  border-bottom: 1px solid var(--edge);
+  background: var(--cream-sink);
+  max-height: 32%;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.board-strip-head {
+  font-family: var(--f-eyebrow);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ink-dim);
+  padding: 8px 15px 5px;
+}
+.board-strip-head::before { content: "\25A3 "; }  /* ▣ */
+
+.board-rows { padding: 0 9px 9px; }
+.board-empty { color: var(--ink-faint); font-size: 11px; padding: 2px 6px 6px; }
+
+.board-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 8px;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: background 0.12s var(--ease);
+}
+.board-row:hover { background: var(--cobalt-tint); }
+.board-row .light { margin-top: 2px; flex-shrink: 0; }
+
+.board-row-body { min-width: 0; flex: 1; }
+.board-row-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-row-brief {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.board-row-brief.empty { color: var(--ink-faint); font-style: italic; }

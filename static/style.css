@@ -1,0 +1,844 @@
+/* claude-hub — "Reading Room" (Concept 1A).
+   FBI visual DNA, ported from design/concept-1a-reading-room.dc.html:
+   Newsreader serif (names, thread body) · Martian Mono classified eyebrows
+   (9px, .2em, uppercase) · JetBrains Mono (data / IDs / terminal) · Unbounded
+   (display anchors). Dark, night-viable, no pure white. 5-tier session-state,
+   each as GLYPH + WORD + COLOR (never colour-alone). Red is signal-only.
+   Bold/sharp geometry (0–2px radius); badges are bracketed mono tags, NOT pills;
+   round status dots are the only curve. Semantic motion only. */
+
+:root {
+  --ink:#0E1116; --ink-2:#161B23; --ink-3:#1F2630; --ink-line:#2A3340; --ink-line-soft:#1B232E;
+  --abyss:#0b0e13;                     /* advisor terminal floor (darker than ink) */
+  --paper:#F5F2EC; --paper-dim:#C9C4B9; --paper-mute:#8B8C92; --paper-fade:#5A5F6A;
+  /* accent (was red #C72631) — recolored to the user's green per request */
+  --red:#398255; --red-deep:#2C6A45;
+  /* error/danger semantic — keeps the old red so 🔴 errored stays distinct from 🟢 done */
+  --err:#C72631; --err-deep:#8C2127;
+  --amber:#C99022; --amber-soft:#8C7028;
+  --green:#4A8B5C; --green-bright:#5FB479; --orange-red:#C66829; --stab:#4A9AB5;
+  --feed:#4FB8C4; --review:#8FA0C0;     /* relation-type wires (Map view) */
+  --warm:#E8674A;                       /* Slice 5: HUMAN-authored marks (authoritative/solid) */
+  --cool:var(--feed);                   /* Slice 5: SECRETARY marks (advisory/dashed) — cyan/blue */
+
+  --f-serif:'Newsreader',Georgia,serif;
+  --f-mono:'JetBrains Mono',ui-monospace,monospace;
+  --f-tech:'Martian Mono',ui-monospace,monospace;
+  --f-disp:'Unbounded','Newsreader',sans-serif;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+
+html, body {
+  height:100%;
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--f-serif);
+}
+body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+::-webkit-scrollbar { width:9px; height:9px; }
+::-webkit-scrollbar-thumb { background:var(--ink-line); border-radius:0; }
+::-webkit-scrollbar-track { background:transparent; }
+
+@keyframes live  { 0%,100%{opacity:1} 50%{opacity:.35} }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ---------------------------------------------------------------- primitives */
+.eyebrow {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--paper-mute);
+}
+.dot { width:8px; height:8px; border-radius:50%; flex:none; display:inline-block; }
+.dot.live { animation:live 1.6s infinite; }
+
+/* bracketed mono tag — NOT a pill */
+.tag {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+  padding:2px 6px; border:1px solid currentColor; border-radius:1px; white-space:nowrap;
+}
+/* S7: queued-relay count badge (Rail + Map tiles) — a small amber pill, distinct from
+   the state tag, signalling relays parked for a busy target until it next finishes. */
+.queue-badge {
+  flex:none; font-family:var(--f-tech); font-size:8.5px; letter-spacing:.08em; white-space:nowrap;
+  color:var(--amber); border:1px solid var(--amber-soft); border-radius:1px; padding:1px 4px;
+  background:rgba(201,144,34,.08);
+}
+.st-run{color:var(--green)} .st-need{color:var(--amber)} .st-done{color:var(--stab)}
+.st-idle{color:var(--paper-mute)} .st-err{color:var(--err)}
+.bg-run{background:var(--green)} .bg-need{background:var(--amber)} .bg-done{background:var(--stab)}
+.bg-idle{background:var(--paper-mute)} .bg-err{background:var(--err)}
+
+.vbtn {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+  padding:5px 11px; border:1px solid var(--ink-line); color:var(--paper-mute);
+  cursor:pointer; background:transparent;
+}
+.vbtn.on { color:var(--ink); background:var(--paper-dim); border-color:var(--paper-dim); font-weight:600; }
+.vbtn:disabled { cursor:not-allowed; opacity:.55; }
+
+.hidden { display:none !important; }
+
+/* ================================================================ MASTHEAD */
+.masthead {
+  height:48px; flex:none; display:flex; align-items:center; gap:16px;
+  padding:0 18px; background:var(--ink-2); border-bottom:1px solid var(--ink-line);
+}
+.brand { display:flex; align-items:center; gap:9px; }
+.brand-mark { width:12px; height:12px; background:var(--red); box-shadow:0 0 12px rgba(57,130,85,.45); flex:none; }
+.brand-name { font-family:var(--f-disp); font-weight:800; letter-spacing:.04em; font-size:15px; }
+.brand-dot { color:var(--paper-fade); }
+.masthead-tag { border-left:1px solid var(--ink-line); padding-left:16px; }
+.masthead-lede {
+  font-size:14px; font-style:italic; color:var(--paper-dim);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+}
+.view-toggle { margin-left:auto; display:flex; border:1px solid var(--ink-line); flex:none; }
+.masthead-stat {
+  display:flex; align-items:center; gap:7px; flex:none;
+  font-family:var(--f-mono); font-size:11px; color:var(--paper-dim);
+  border-left:1px solid var(--ink-line); padding-left:14px;
+}
+.conn { width:8px; height:8px; border-radius:50%; background:var(--err-deep); flex:none; }
+.conn.up { background:var(--green); box-shadow:0 0 8px rgba(74,139,92,.5); }
+
+/* S3 global near-limit warning — hidden until rate_limit_event fires at warning */
+.quota-warn {
+  flex:none; font-family:var(--f-tech); font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  color:#e7bfb2; background:rgba(199,38,49,.1); border:1px solid var(--err-deep); padding:3px 8px; white-space:nowrap;
+}
+
+/* Map controls hosted in the masthead — the Switchboard needs no second bar.
+   .map-only is hidden until body.on-map (set in setView); the lede yields the row. */
+.map-only { display:none; }
+.on-map .map-only { display:flex; }
+.on-map .masthead-lede { display:none; }
+.on-map .masthead-tag { display:none; } /* drop the "Switchboard" label on the Map */
+.masthead-map { align-items:center; gap:14px; min-width:0; }
+.masthead-map .map-hud-legend { margin-left:0; } /* the view-toggle owns the right-side push */
+
+/* ================================================================ FRAME */
+.frame { flex:1; display:flex; min-height:0; }
+
+/* ---------------------------------------------------------------- LEFT RAIL */
+.rail-left {
+  width:300px; flex:none; background:var(--ink-2); border-right:1px solid var(--ink-line);
+  display:flex; flex-direction:column; min-height:0;
+}
+.rail-left-head {
+  padding:14px 16px 8px; display:flex; align-items:center; justify-content:space-between;
+}
+.rail-new {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; color:var(--red);
+  cursor:pointer; background:transparent; border:none; text-transform:uppercase;
+}
+.rail-new:hover { color:var(--green-bright); }
+.rail-left-list { flex:1; overflow-y:auto; padding:0 10px 14px; }
+.rail-left-empty { color:var(--paper-mute); font-size:13px; line-height:1.6; padding:10px 6px; font-style:italic; }
+.rail-left-empty .lk { color:var(--red); font-family:var(--f-tech); font-size:9px; letter-spacing:.1em; }
+
+.rail-group { display:flex; align-items:center; gap:8px; padding:14px 6px 8px; }
+.rail-group:first-child { padding-top:6px; }
+.rail-group-name {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.14em;
+  color:var(--paper-mute); text-transform:uppercase;
+}
+.rail-group-rule { flex:1; height:1px; background:var(--ink-line); }
+.rail-group-count { font-size:10px; color:var(--paper-fade); font-family:var(--f-mono); }
+
+.srow {
+  padding:9px 12px; margin-bottom:5px; cursor:pointer;
+  border:1px solid transparent; border-left:2px solid transparent;
+}
+.srow:hover { background:var(--ink-3); }
+.srow.active { background:var(--ink-3); border-color:var(--ink-line); border-left:2px solid var(--red); padding:10px 12px; }
+.srow-top { display:flex; align-items:center; gap:8px; }
+.srow-name { font-family:var(--f-mono); font-size:12.5px; color:var(--paper-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.srow.active .srow-name { font-weight:600; color:var(--paper); }
+.srow-tag { margin-left:auto; }
+/* per-row delete ✕ — quiet until the row is hovered, reddens on its own hover */
+.srow-del {
+  background:transparent; border:none; color:var(--paper-fade); cursor:pointer;
+  font-size:12px; line-height:1; padding:2px 4px; margin:-2px -2px -2px 0;
+  opacity:0; transition:opacity .12s, color .12s;
+}
+.srow:hover .srow-del, .srow.active .srow-del { opacity:.5; }
+.srow-del:hover { color:var(--red); opacity:1; }
+.srow-sub { font-size:13px; color:var(--paper-mute); margin-top:4px; padding-left:16px; font-style:italic;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ---------------------------------------------------------------- CENTER */
+.center { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--ink); }
+
+.situation {
+  flex:none; padding:10px 18px; border-bottom:1px solid var(--ink-line); background:var(--ink-2);
+  display:flex; align-items:center; gap:9px; overflow-x:auto;
+}
+.situation-chips { display:flex; align-items:center; gap:9px; }
+.schip {
+  display:flex; align-items:center; gap:6px; flex:none;
+  border:1px solid var(--ink-line); padding:4px 10px;
+  font-family:var(--f-mono); font-size:11px; color:var(--paper-dim); cursor:pointer;
+}
+.schip .dot { width:6px; height:6px; }
+.schip.need { background:rgba(201,144,34,.08); border-color:var(--amber-soft); color:#ecd9b0; }
+.schip.err  { background:rgba(199,38,49,.07); border-color:var(--err-deep); color:#e7bfb2; }
+.schip.idle { color:var(--paper-mute); }
+.situation-empty { font-size:12px; color:var(--paper-fade); font-style:italic; }
+
+.focus { flex:1; min-height:0; display:flex; flex-direction:column; padding:18px 22px 0; }
+
+.focus-empty { flex:1; display:flex; align-items:center; justify-content:center; }
+.focus-empty-inner { text-align:center; max-width:360px; }
+.focus-empty-inner p { font-size:15px; color:var(--paper-mute); line-height:1.6; margin-top:10px; font-style:italic; }
+
+.focus-head { flex:none; display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.focus-head .dot { width:9px; height:9px; }
+.focus-name { font-family:var(--f-disp); font-size:24px; font-weight:700; color:var(--paper);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46%; }
+.focus-meta { font-family:var(--f-mono); font-size:11px; color:var(--paper-fade); }
+.route-btn {
+  margin-left:auto; flex:none; font-family:var(--f-tech); font-size:9px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--red); background:transparent; border:1px solid var(--red-deep);
+  padding:7px 12px; cursor:pointer;
+}
+.route-btn:hover { background:rgba(57,130,85,.07); }
+
+/* Slice 7: fork affordance (appears as context nears the auto-compact line) */
+.fork-btn { font-family: var(--f-mono); font-size: 11px; color: var(--amber); background: none;
+  border: 1px solid var(--amber-soft); padding: 3px 8px; cursor: pointer; margin-left: 6px; }
+.fork-btn:hover { color: var(--paper); border-color: var(--amber); }
+.fork-btn[disabled] { opacity: .5; cursor: default; }
+
+/* S3 per-session context fuel-gauge (focus header). Green→amber→red as the fill
+   approaches the auto-compact line; the thin marker is that line. */
+.ctx-gauge { display:flex; align-items:center; gap:7px; flex:none; }
+.ctx-bar {
+  position:relative; width:96px; height:7px; flex:none;
+  background:var(--ink-3); border:1px solid var(--ink-line); overflow:hidden;
+}
+.ctx-fill {
+  position:absolute; left:0; top:0; bottom:0; width:0; background:var(--green);
+  transition:width .4s ease, background-color .4s ease;
+}
+.ctx-fill.warm { background:var(--amber); }
+.ctx-fill.hot  { background:var(--err); }
+.ctx-compact { position:absolute; top:-1px; bottom:-1px; width:1px; background:var(--paper-fade); }
+.ctx-label { font-family:var(--f-mono); font-size:9.5px; letter-spacing:.04em; text-transform:none; color:var(--paper-fade); }
+
+.route-bar {
+  flex:none; display:flex; flex-direction:column; align-items:stretch; gap:8px; margin-bottom:14px;
+  background:var(--ink-2); border:1px solid var(--ink-line); padding:8px 12px;
+}
+.route-row { display:flex; align-items:center; gap:9px; }
+.route-actions { justify-content:flex-end; }
+.route-bar select {
+  background:var(--abyss); border:1px solid var(--ink-line); color:var(--paper-dim);
+  font-family:var(--f-mono); font-size:11px; padding:5px 8px;
+}
+.route-bar button {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+  background:transparent; border:1px solid var(--ink-line); color:var(--paper-mute); padding:6px 11px; cursor:pointer;
+}
+.route-bar #route-send { color:var(--green); border-color:var(--green); }
+.route-bar #route-send:hover { background:rgba(74,139,92,.1); }
+/* S6: verbatim preview (what the target receives, server-resolved) + opt-in human framing */
+.route-verbatim, .route-section-label { color:var(--paper-fade); }
+.route-preview {
+  margin:0; max-height:120px; overflow:auto; background:var(--abyss); border:1px solid var(--ink-line);
+  color:var(--paper-dim); font-family:var(--f-mono); font-size:11px; line-height:1.5; padding:7px 9px;
+  white-space:pre-wrap; word-break:break-word;
+}
+.route-section {
+  background:var(--abyss); border:1px solid var(--ink-line); color:var(--paper-dim);
+  font-family:var(--f-mono); font-size:11px; line-height:1.5; padding:6px 9px; resize:vertical;
+}
+.route-section:focus { outline:none; border-color:var(--green); }
+
+/* launch form */
+.launch { flex:none; display:flex; flex-direction:column; gap:9px; margin-bottom:14px;
+  background:var(--ink-2); border:1px solid var(--ink-line); padding:14px 16px; }
+.launch-row { display:flex; gap:9px; }
+.launch input, .launch textarea, .launch select {
+  flex:1; background:var(--abyss); border:1px solid var(--ink-line); color:var(--paper);
+  font-family:var(--f-mono); font-size:12px; padding:8px 10px; resize:vertical;
+}
+/* the model picker is a fixed, narrow control — don't let it flex-grow like the text inputs */
+.launch select { flex:0 0 auto; }
+.launch input::placeholder, .launch textarea::placeholder { color:var(--paper-fade); }
+.launch input:focus, .launch textarea:focus, .launch select:focus { outline:none; border-color:var(--red-deep); }
+.launch-actions { display:flex; gap:9px; }
+.launch-go {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; text-transform:uppercase; font-weight:600;
+  color:var(--ink); background:var(--green); border:none; padding:8px 16px; cursor:pointer;
+}
+.launch-go:hover { background:var(--green-bright); }
+.launch-cancel {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--paper-mute); background:transparent; border:1px solid var(--ink-line); padding:8px 14px; cursor:pointer;
+}
+
+/* the correspondence thread */
+.thread {
+  flex:1; min-height:0; overflow-y:auto; padding-right:6px;
+  display:flex; flex-direction:column; gap:16px; padding-bottom:16px;
+}
+.msg { max-width:none; }
+/* per-turn type marker — a full circle in a left gutter, replacing the removed
+   "Claude · model" eyebrow so each turn is still scannable at a glance:
+   green = a normal Claude message, orange = tool usage / action. */
+.msg.assistant, .msg.tool { position:relative; padding-left:20px; }
+.msg.assistant::before, .msg.tool::before {
+  content:""; position:absolute; left:2px; top:6px; width:9px; height:9px; border-radius:50%;
+}
+.msg.assistant::before { background:var(--red); }       /* green accent — normal message */
+.msg.tool::before { background:var(--orange-red); }      /* orange — tool usage */
+.msg-role { margin-bottom:6px; }
+.msg.you .msg-role { color:var(--paper-mute); }
+.msg.assistant .msg-role { color:var(--red); }
+.msg.tool .msg-role, .msg.relay .msg-role { color:var(--stab); }
+.msg.error .msg-role { color:var(--err); }
+/* terminal font (JetBrains Mono) for the reading body — clearer than the serif,
+   brighter paper for contrast. Assistant text is the brightest; user turns are
+   dimmed + rule-bordered so they still read as quoted input. */
+.msg-text { font-family:var(--f-mono); font-size:13px; line-height:1.7; color:var(--paper); white-space:pre-wrap; word-break:break-word; }
+.msg.you .msg-text {
+  color:var(--paper-dim); font-style:normal; border-left:2px solid var(--ink-line); padding-left:14px;
+}
+.msg.tool .msg-text, .msg.relay .msg-text {
+  font-family:var(--f-mono); font-size:12.5px; color:var(--paper-mute);
+  background:var(--ink-2); border:1px solid var(--ink-line); border-left:2px solid var(--stab);
+  padding:9px 12px;
+}
+.msg.error .msg-text {
+  font-family:var(--f-mono); font-size:12.5px; color:#e7bfb2;
+  background:rgba(199,38,49,.07); border:1px solid var(--err-deep); padding:9px 12px;
+}
+.msg.assistant.streaming .msg-text::after {
+  content:""; display:inline-block; width:7px; height:13px; background:var(--red);
+  margin-left:3px; vertical-align:middle; animation:blink 1s steps(1) infinite;
+}
+
+/* reply box */
+.reply {
+  flex:none; margin-bottom:16px; background:var(--ink-2); border:1px solid var(--ink-line);
+  padding:11px 14px; display:flex; align-items:center; gap:11px;
+}
+.reply-prompt { color:var(--red); font-family:var(--f-mono); font-size:13px; }
+.reply input {
+  flex:1; background:transparent; border:none; color:var(--paper);
+  font-family:var(--f-serif); font-size:14px; outline:none;
+}
+.reply input::placeholder { color:var(--paper-mute); font-style:italic; }
+.reply input:disabled { opacity:.5; }
+.reply-send {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--paper-mute); background:transparent; border:1px solid var(--ink-line); padding:6px 11px; cursor:pointer;
+}
+.reply-send:not(:disabled):hover { color:var(--green); border-color:var(--green); }
+.reply-send:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ---------------------------------------------------------------- RIGHT DOCK */
+.dock {
+  width:392px; flex:none; background:var(--abyss); border-left:1px solid var(--ink-line);
+  display:flex; flex-direction:column; min-height:0;
+}
+.dock-head {
+  flex:none; padding:13px 16px; border-bottom:1px solid var(--ink-line-soft);
+  display:flex; align-items:center; gap:9px;
+}
+.dock-mark { width:8px; height:8px; background:var(--red); box-shadow:0 0 10px rgba(57,130,85,.5); flex:none; }
+.dock-scope { margin-left:auto; }
+.dock-clear { background:transparent; border:none; color:var(--paper-fade); font-size:14px; cursor:pointer; padding:0 2px; }
+.dock-clear:hover { color:var(--red); }
+.dock-clear.confirm { color:var(--red); font-family:var(--f-tech); font-size:9px; letter-spacing:.1em; text-transform:uppercase; }
+
+.dock-chat {
+  flex:1; min-height:0; overflow-y:auto;
+  display:flex; flex-direction:column; justify-content:flex-end;
+  padding:16px 16px 6px; font-family:var(--f-mono); font-size:12.5px; line-height:1.65;
+}
+.adv-line { margin-bottom:14px; }
+.adv-line.you { color:var(--paper-mute); }
+.adv-line.you .mk { color:var(--red); }
+.adv-line.bot { color:var(--paper-dim); margin-bottom:16px; }
+.adv-line.bot .mk { color:var(--stab); }
+.adv-line.bot.streaming { color:var(--paper); margin-bottom:6px; }
+.adv-line.bot.streaming .tx::after {
+  content:""; display:inline-block; width:7px; height:14px; background:var(--red);
+  vertical-align:middle; animation:blink 1s steps(1) infinite; margin-left:1px;
+}
+.adv-line.err { color:#e7bfb2; }
+.adv-phase {
+  color:var(--paper-fade); font-style:italic; margin-bottom:10px; font-size:11.5px; font-family:var(--f-serif);
+}
+.adv-meta { color:var(--paper-fade); font-size:10px; font-family:var(--f-tech); letter-spacing:.08em; margin:-6px 0 14px; }
+.dock-empty { color:var(--paper-fade); font-style:italic; font-family:var(--f-serif); font-size:13px; }
+
+/* approval rider — Bureau Verdict stamp */
+.rider-slot { flex:none; }
+.rider {
+  margin:0 14px 12px; background:rgba(201,144,34,.06); border:1px solid var(--amber-soft);
+  border-left:3px solid var(--amber); padding:12px 13px; position:relative;
+}
+.rider-stamp {
+  position:absolute; top:9px; right:11px; font-family:var(--f-disp); font-weight:800; font-size:8px;
+  letter-spacing:.15em; color:var(--amber); border:1.5px solid var(--amber); padding:2px 5px; transform:rotate(-3deg);
+}
+.rider-head { color:var(--amber); margin-bottom:8px; }
+.rider-cmd {
+  font-family:var(--f-mono); font-size:12px; color:#ecd9b0; background:#15110a;
+  border:1px solid var(--amber-soft); padding:8px 10px; margin-bottom:10px;
+  max-height:140px; overflow:auto; white-space:pre-wrap; word-break:break-word;
+}
+.rider-actions { display:flex; gap:8px; }
+.rider-actions button {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; padding:8px;
+}
+.rider-allow { flex:1; color:var(--ink); background:var(--green); border:none; font-weight:600; }
+.rider-allow:hover { background:var(--green-bright); }
+.rider-refuse { flex:1; color:#e7bfb2; background:transparent; border:1px solid var(--err-deep); }
+.rider-refuse:hover { background:rgba(199,38,49,.08); }
+.rider-actions button:disabled { opacity:.5; cursor:default; }
+.rider.allowed { border-left-color:var(--green); }
+.rider.denied  { border-left-color:var(--err); }
+
+.dock-input {
+  flex:none; padding:12px 14px; border-top:1px solid var(--ink-line-soft); background:var(--ink-2);
+  display:flex; align-items:center; gap:10px;
+}
+.dock-prompt { color:var(--red); font-family:var(--f-mono); font-size:14px; }
+.dock-input input {
+  flex:1; background:var(--abyss); border:1px solid var(--ink-line); color:var(--paper);
+  font-family:var(--f-mono); font-size:13px; padding:11px 13px; outline:none;
+}
+.dock-input input::placeholder { color:var(--paper-mute); }
+.dock-input input:focus { border-color:var(--red-deep); }
+.dock-input input:disabled { opacity:.5; }
+.dock-input button {
+  background:transparent; border:1px solid var(--ink-line); color:var(--paper-mute);
+  font-family:var(--f-mono); font-size:14px; cursor:pointer; padding:8px 12px;
+}
+.dock-input button:not(:disabled):hover { color:var(--red); border-color:var(--red-deep); }
+.dock-input button:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ================================================================ MAP VIEW
+   Concept 4A "Switchboard": monitor tiles as nodes in workstream lanes; the
+   secretary's relations drawn as BOLD ORTHOGONAL traces (axis-aligned only —
+   no curves). solid = explicit/confirmed · dashed = secretary-inferred. */
+.map-view { flex:1; position:relative; min-height:0; overflow:hidden; background:var(--ink); }
+
+.map-blueprint {
+  position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:linear-gradient(var(--ink-line-soft) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--ink-line-soft) 1px,transparent 1px);
+  background-size:46px 46px;
+}
+
+/* ---- situation HUD (top bar) ---- */
+.map-hud {
+  position:absolute; left:16px; right:16px; top:14px; z-index:8;
+  display:flex; align-items:center; gap:16px;
+  background:var(--ink-2); border:1px solid var(--ink-line); padding:9px 16px;
+}
+.map-hud-brand { display:flex; align-items:center; gap:9px; flex:none; }
+.map-hud-name { border:1px solid var(--ink-line); padding:2px 6px; color:var(--paper-dim); letter-spacing:.18em; }
+.map-hud-counts { display:flex; align-items:center; gap:12px; flex:none; }
+.hud-count { display:flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:11px; color:var(--paper-dim); }
+.hud-count .dot { width:7px; height:7px; }
+.map-hud-legend { margin-left:auto; display:flex; align-items:center; gap:14px; flex:none; }
+.map-hud-legend .leg { display:flex; align-items:center; gap:6px; }
+.leg-wire { width:18px; height:0; flex:none; }
+.leg-wire.solid  { border-top:2px solid var(--feed); }
+.leg-wire.dashed { border-top:2px dashed var(--review); }
+.map-hud-slot { display:flex; align-items:center; gap:9px; border-left:1px solid var(--ink-line); padding-left:14px; flex:none; opacity:.4; }
+.map-hud-slot .eyebrow { color:var(--paper-fade); }
+/* S3: quiet reset readout once a rate_limit_event lands; lit red at the warning */
+.map-hud-slot.live { opacity:1; }
+.map-hud-slot .quota { font-family:var(--f-mono); font-size:11px; letter-spacing:.04em; color:var(--paper-dim); }
+.map-hud-slot.warn { border-left-color:var(--err-deep); }
+.map-hud-slot.warn .eyebrow { color:var(--err); }
+.map-hud-slot.warn .quota { color:#e7bfb2; }
+
+/* ---- stage + layers ---- */
+/* F-COORD: the stage clips the panned/zoomed world; the empty grid still shows through */
+.map-stage { position:absolute; inset:0; overflow:hidden; }
+/* F-COORD: the transformed world group. transform-origin 0 0 so toWorld/toScreen
+   math is a plain translate+scale about the stage top-left. It fills the stage
+   (inset:0) BEFORE transform, so children keep their existing 0..100% positions. */
+/* will-change is toggled in JS only DURING a pan/zoom (Viewport.applyTransform), then
+   dropped on settle — a permanent layer hint rasterizes once and bitmap-scales, which
+   pixelates the tiles when zoomed in until a re-raster. */
+.map-world { position:absolute; inset:0; transform-origin:0 0; }
+.map-edges { position:absolute; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; }
+.map-lanes { position:absolute; inset:0; z-index:2; pointer-events:none; }
+/* the nodes layer is a full-bleed container; make IT click-through so it doesn't
+   swallow clicks meant for the frame layer below (the ✕/⚡ tab buttons + frame-drag)
+   or empty-canvas pan. Only the tiles inside it stay interactive (see .map-tile). */
+.map-nodes { position:absolute; inset:0; z-index:3; pointer-events:none; }
+.map-labels { position:absolute; inset:0; z-index:4; pointer-events:none; }
+
+.map-empty {
+  position:absolute; left:50%; top:48%; transform:translate(-50%,-50%); z-index:3;
+  color:var(--paper-mute); font-size:15px; font-style:italic;
+}
+.map-empty .lk { color:var(--red); font-family:var(--f-tech); font-size:10px; letter-spacing:.1em; font-style:normal; }
+
+/* ---- lane headers ---- */
+.map-lane-head { position:absolute; top:11%; transform:translateX(-50%); text-align:center; }
+.map-lane-name { color:var(--paper-dim); letter-spacing:.22em; }
+.map-lane-rule { display:block; height:1px; background:var(--ink-line); margin-top:6px; width:200px; }
+
+/* ---- monitor tiles (#2 squared/bold) ---- */
+.map-tile {
+  position:absolute; transform:translate(-50%,-50%); width:200px; z-index:3; cursor:pointer;
+  background:var(--ink-2); border:1px solid var(--ink-line); border-left:2px solid var(--paper-mute); padding:10px 12px;
+}
+.map-tile:hover { border-color:var(--paper-fade); }
+.map-tile.focused {
+  border-color:var(--feed); box-shadow:0 0 0 1px rgba(79,184,196,.3), 0 0 24px rgba(79,184,196,.13); z-index:6;
+}
+.map-tile-lane {
+  position:absolute; top:7px; right:9px; font-family:var(--f-tech); font-size:8px; letter-spacing:.1em; color:var(--paper-fade);
+}
+.map-tile-head { display:flex; align-items:center; gap:7px; padding-right:34px; }
+.map-tile-head .dot { width:8px; height:8px; }
+.map-tile-name { font-family:var(--f-mono); font-size:12.5px; font-weight:600; color:var(--paper);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.map-tile-stat {
+  margin-left:auto; flex:none; font-family:var(--f-tech); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+}
+.map-tile-info {
+  font-family:var(--f-serif); font-size:11px; color:var(--paper-mute); line-height:1.35; margin-top:6px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+/* S3: per-node context fill stripe (mirrors the Rail header gauge) */
+.map-tile-ctx { position:relative; height:4px; margin-top:8px; background:var(--ink-3); overflow:hidden; }
+.map-tile-ctx > i { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--green); }
+.map-tile-ctx > i.warm { background:var(--amber); }
+
+/* ── Slice 1: alive tiles ────────────────────────────────────────────────────
+   needs-you tiles pulse an amber attention-ring (ported @keyframes `need` from
+   design/concept-4a-switchboard.dc.html:38 — designed but never ported); running
+   tiles breathe a faint green halo. Glyph+word+colour already carry state; this is
+   a redundant MOTION cue for "which sessions want me", not colour-alone. */
+@keyframes need {
+  0%, 100% { box-shadow: 0 0 0 1px var(--amber); }
+  50%      { box-shadow: 0 0 0 1px var(--amber), 0 0 22px rgba(201,144,34,.35); }
+}
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 1px transparent; }
+  50%      { box-shadow: 0 0 0 1px rgba(74,139,92,.22), 0 0 16px rgba(74,139,92,.12); }
+}
+.map-tile.alive-need { border-color: var(--amber); animation: need 1.6s ease-in-out infinite; }
+.map-tile.alive-run  { animation: breathe 3.2s ease-in-out infinite; }
+
+/* a focused needs-you tile keeps the amber ring but stops pulsing while you read it */
+.map-tile.alive-need.focused { animation: none; box-shadow: 0 0 0 1px var(--amber), 0 0 22px rgba(201,144,34,.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  .map-tile.alive-need { animation: none; box-shadow: 0 0 0 1px var(--amber), 0 0 18px rgba(201,144,34,.28); }
+  .map-tile.alive-run  { animation: none; }
+}
+.map-tile-ctx > i.hot  { background:var(--err); }
+
+/* Slice 3: connector nub + the draft wire overlay */
+/* RAIL-TYPE: moved to the bottom-LEFT so the SE corner is free for the resize grip */
+.map-tile-wire {
+  position: absolute; left: 6px; bottom: 6px; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-mono); color: var(--paper-fade); cursor: crosshair;
+  border: 1px solid var(--ink-line); background: var(--ink-2); pointer-events: auto;
+}
+.map-tile-wire:hover { color: var(--warm, #E8674A); border-color: var(--warm, #E8674A); }
+.map-draft { position: absolute; inset: 0; z-index: 9; pointer-events: none; } /* screen-space, above #map-world */
+
+/* RAIL-TYPE: SE-corner resize grip. Faint diagonal hatch in the very corner;
+   brightens on hover. nwse cursor signals the drag axis. */
+.map-tile-resize {
+  position: absolute; right: 0; bottom: 0; width: 15px; height: 15px;
+  cursor: nwse-resize; pointer-events: auto; z-index: 4; opacity: .55;
+  background:
+    linear-gradient(135deg, transparent 0 6px, var(--paper-fade) 6px 7px,
+      transparent 7px 9px, var(--paper-fade) 9px 10px, transparent 10px 12px,
+      var(--paper-fade) 12px 13px, transparent 13px);
+}
+.map-tile-resize:hover { opacity: 1; }
+.map-tile:hover .map-tile-resize { opacity: .85; }
+/* RAIL-TYPE: a sized tile is box-sized (height includes padding) and lays its body
+   out as a column so the last-message preview flexes to fill the manual height. */
+.map-tile.sized { box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+.map-tile.sized .map-tile-info {
+  flex: 1 1 auto; -webkit-line-clamp: unset; overflow: hidden; margin-bottom: 4px;
+}
+.map-wire-draft { stroke: var(--warm, #E8674A); stroke-width: 2; stroke-dasharray: 4 4; }
+
+/* ---- relation labels (color = type; solid/dashed lives on the wire) ---- */
+.map-relchip {
+  position:absolute; transform:translate(-50%,-50%); z-index:4; white-space:nowrap;
+  font-family:var(--f-tech); font-size:8px; letter-spacing:.12em; text-transform:uppercase;
+  background:var(--ink); padding:2px 6px; border:1px solid transparent;
+}
+
+/* ── Slice 5: warm/cool authorship encoding ──────────────────────────────────
+   Human = warm + solid (authoritative); secretary = cool + dashed (advisory).
+   The secretary never overrides a human mark (add_relation no-downgrade); this is
+   that invariant made visible. */
+.map-relchip.mine, .map-note.mine .map-note-pin, .map-frame.mine { --mark: var(--warm); }
+.map-relchip.its,  .map-note.its  .map-note-pin, .map-suggest-chip, .map-relay-chip { --mark: var(--cool); }
+
+/* manual (human) wire chip: warm border; inferred (secretary) chip: cool border */
+.map-relchip.mine { border-color: var(--warm); color: var(--warm); }
+.map-relchip.its  { border-color: var(--cool); }
+
+/* secretary proposal chips read cool (advisory) regardless of relation type */
+.map-suggest-chip { border-color: var(--cool); }
+.map-relay-chip   { box-shadow: inset 2px 0 0 var(--cool); }
+
+/* notes + frames already carry .mine/.its from Slices 2/4 — the tokens above unify them */
+
+/* ---- floating advisor console ---- */
+.map-console {
+  position:absolute; left:50%; bottom:18px; transform:translateX(-50%); width:min(700px,72%); z-index:9;
+  display:flex; flex-direction:column; max-height:240px;
+  background:var(--ink-2); border:1px solid var(--ink-line); border-top:2px solid var(--red-deep);
+  box-shadow:0 18px 50px rgba(0,0,0,.6);
+}
+.map-console-head {
+  flex:none; display:flex; align-items:center; gap:9px; padding:9px 15px; border-bottom:1px solid var(--ink-line-soft);
+}
+.map-console-scope { color:var(--paper-mute); }
+.map-console-body {
+  flex:1; min-height:54px; overflow-y:auto; padding:11px 15px 6px;
+  font-family:var(--f-mono); font-size:12px; line-height:1.6; color:var(--paper-dim);
+  display:flex; flex-direction:column; justify-content:flex-end;
+}
+.map-console-body .mc-you { color:var(--paper-mute); margin-bottom:6px; }
+.map-console-body .mc-you .mk { color:var(--red); }
+.map-console-body .mc-bot { color:var(--paper); }
+.map-console-body .mc-bot .mk { color:var(--feed); }
+.map-console-body .mc-phase { color:var(--paper-fade); font-style:italic; font-family:var(--f-serif); font-size:11px; }
+.map-console-body.streaming .mc-bot .tx::after {
+  content:""; display:inline-block; width:7px; height:13px; background:var(--red);
+  vertical-align:middle; margin-left:2px; animation:blink 1s steps(1) infinite;
+}
+.map-console-input { flex:none; display:flex; align-items:center; gap:10px; padding:9px 14px 11px; background:var(--ink-2); }
+.map-console-input .dock-prompt { flex:none; }
+.map-console-input input {
+  flex:1; background:var(--abyss); border:1px solid var(--ink-line); color:var(--paper);
+  font-family:var(--f-mono); font-size:12.5px; padding:9px 12px; outline:none;
+}
+.map-console-input input::placeholder { color:var(--paper-mute); }
+.map-console-input input:focus { border-color:var(--red-deep); }
+.map-console-input button {
+  background:transparent; border:1px solid var(--ink-line); color:var(--paper-mute);
+  font-family:var(--f-mono); font-size:14px; cursor:pointer; padding:8px 12px;
+}
+.map-console-input button:hover { color:var(--red); border-color:var(--red-deep); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dot.live, .adv-line.bot.streaming .tx::after, .msg.assistant.streaming .msg-text::after,
+  .map-console-body.streaming .mc-bot .tx::after { animation:none; }
+}
+
+/* ---------------------------------------------------- S4: actionable canvas */
+/* right-click context menu — a sharp bureau panel, mono items, no pills */
+.ctx-menu {
+  position:fixed; z-index:1000; min-width:184px;
+  background:var(--ink-2); border:1px solid var(--ink-line);
+  box-shadow:0 10px 30px rgba(0,0,0,.5); padding:4px 0;
+}
+.ctx-item {
+  display:flex; align-items:baseline; gap:10px; justify-content:space-between;
+  padding:7px 13px; cursor:pointer;
+  font-family:var(--f-mono); font-size:12.5px; color:var(--paper-dim); white-space:nowrap;
+}
+.ctx-item:hover { background:var(--ink-3); color:var(--paper); }
+.ctx-item.disabled { color:var(--paper-fade); cursor:default; }
+.ctx-item.disabled:hover { background:transparent; color:var(--paper-fade); }
+.ctx-label { flex:1; }
+.ctx-hint {
+  font-family:var(--f-tech); font-size:8.5px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--paper-fade);
+}
+.ctx-item:hover .ctx-hint { color:var(--red); }
+.ctx-item.disabled:hover .ctx-hint { color:var(--paper-fade); }
+.ctx-sep { height:1px; margin:4px 0; background:var(--ink-line); }
+/* destructive menu item (Delete session) */
+.ctx-item.danger { color:#e08a7f; }
+.ctx-item.danger:hover { background:rgba(199,38,49,.12); color:#f0b6ac; }
+.ctx-item.danger:hover .ctx-hint { color:#e08a7f; }
+
+/* inline rename — an input dropped in place of a name, matching its metrics */
+.rename-input {
+  font-family:var(--f-mono); font-size:12.5px; color:var(--paper);
+  background:var(--abyss); border:1px solid var(--red-deep); border-radius:1px;
+  padding:1px 5px; outline:none; min-width:120px; max-width:240px;
+}
+
+/* secretary name-suggestion chip on a rail row (proposes; user accepts) */
+.suggest-chip {
+  display:flex; align-items:center; gap:7px; margin-top:6px; padding-left:16px;
+  font-family:var(--f-mono); font-size:11.5px; color:var(--paper-mute);
+}
+.suggest-lead { color:var(--stab); letter-spacing:.14em; }
+.suggest-name { color:var(--paper-dim); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.suggest-chip button {
+  flex:none; background:transparent; border:1px solid var(--ink-line); cursor:pointer;
+  font-family:var(--f-tech); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:3px 6px; color:var(--paper-mute);
+}
+.suggest-ok:hover { color:var(--green-bright); border-color:var(--green); }
+.suggest-no:hover { color:var(--red); border-color:var(--red-deep); }
+.map-tile { cursor:pointer; }
+
+/* ---------------------------------------------------- S5: freeform canvas
+   Drag-to-pin tiles (grid-snapped), labeled group-frames (notes, not
+   containers), and secretary frame-suggest chips. Bold/sharp, axis-aligned —
+   the orthogonal aesthetic holds under movement (no curves anywhere). */
+
+/* group-frames — labeled regions UNDER the tiles + edges */
+.map-frames { position:absolute; inset:0; z-index:0; pointer-events:none; }
+.map-frame {
+  position:absolute; border:1px dashed var(--ink-line);
+  background:rgba(143,160,192,.04); /* a faint --review wash — quiet, a note not a panel */
+  pointer-events:auto; cursor:grab; /* grab inside a frame to move just that frame */
+}
+.map-frame.dragging { cursor:grabbing; }
+.map-frame-tab {
+  position:absolute; left:-1px; top:-1px; display:flex; align-items:center; gap:7px;
+  background:var(--ink-2); border:1px solid var(--ink-line); border-left:2px solid var(--review);
+  padding:3px 4px 3px 7px; pointer-events:auto;
+}
+.map-frame-label { color:var(--paper-dim); letter-spacing:.18em; }
+.map-frame-del {
+  background:transparent; border:none; color:var(--paper-fade); cursor:pointer;
+  font-family:var(--f-mono); font-size:10px; line-height:1; padding:0 2px;
+}
+.map-frame-del:hover { color:var(--red); }
+/* S8: an auto-relay-enabled group renders distinctly — a live (solid, tinted) border +
+   a charged tab so the trusted, auto-firing group is obvious (auto is OFF by default). */
+.map-frame.auto { border-style:solid; border-color:var(--feed); background:rgba(79,184,196,.06); }
+.map-frame.auto > .map-frame-tab { border-left-color:var(--feed); }
+.map-frame-auto {
+  background:transparent; border:none; color:var(--paper-fade); cursor:pointer;
+  font-family:var(--f-mono); font-size:10px; line-height:1; padding:0 2px;
+}
+.map-frame-auto:hover { color:var(--feed); }
+.map-frame-auto.on { color:var(--feed); text-shadow:0 0 6px rgba(79,184,196,.5); }
+/* S8: the auto-routed marker's `undo` affordance (the message itself can't be recalled) */
+.relay-undo {
+  margin-left:6px; background:transparent; border:1px solid var(--ink-line); cursor:pointer;
+  color:var(--paper-fade); font-family:var(--f-mono); font-size:10px; line-height:1; padding:1px 5px;
+}
+.relay-undo:hover { color:var(--red); border-color:var(--red); }
+.relay-undone { margin-left:6px; color:var(--paper-fade); font-size:10px; opacity:.7; }
+/* Slice 2: frame header is a real drag handle; bottom-right resize grip; human frames warm */
+.map-frame-tab { cursor: grab; }
+.map-frame-tab:active { cursor: grabbing; }
+.map-frame { pointer-events: auto; } /* frames are interactive now (override the S5 pointer-events:none on .map-frames children if present) */
+.map-frame-resize {
+  position: absolute; right: -1px; bottom: -1px; width: 14px; height: 14px;
+  cursor: nwse-resize; pointer-events: auto;
+  background: linear-gradient(135deg, transparent 50%, var(--paper-fade) 50%);
+}
+.map-frame.mine { border-color: var(--warm, #E8674A); }           /* Slice 2: human-authored frame reads warm (S5 generalizes) */
+.map-frame.mine > .map-frame-tab { border-left-color: var(--warm, #E8674A); }
+
+/* Slice 6: tracked-initiative frame + the secretary's group image (cool) */
+.map-frame-lock { background: none; border: none; cursor: pointer; color: var(--paper-fade); font-size: 11px; }
+.map-frame-lock.on { color: var(--feed); }
+.map-frame:has(.map-frame-lock.on) { border-style: solid; box-shadow: inset 0 0 0 1px rgba(79,184,196,.25); }
+.map-frame-desc {
+  position: absolute; left: 6px; top: 26px; max-width: 90%;
+  font-family: var(--f-sans, inherit); font-size: 11px; color: var(--paper-dim);
+  border-left: 2px solid var(--cool, var(--feed)); padding-left: 6px; pointer-events: none;
+}
+.map-frame-desc.pending { color: var(--paper-fade); font-style: italic; }
+
+/* draggable tiles: grab affordance, lift while dragging, a corner pin when placed */
+/* pointer-events:auto re-enables the tile now that .map-nodes is click-through */
+.map-tile { cursor:grab; pointer-events:auto; }
+.map-tile.dragging {
+  cursor:grabbing; z-index:7; transition:none;
+  box-shadow:0 8px 30px rgba(0,0,0,.55), 0 0 0 1px var(--paper-fade);
+}
+.map-tile.pinned::after {
+  content:""; position:absolute; top:-3px; right:-3px; width:5px; height:5px;
+  background:var(--feed); box-shadow:0 0 6px rgba(79,184,196,.5);
+}
+
+/* drawing a group-frame: crosshair + a dashed marquee, then an inline label */
+.map-view.framing .map-stage, .map-view.framing .map-tile { cursor:crosshair; }
+.map-marquee {
+  position:absolute; z-index:7; border:1px dashed var(--feed);
+  background:rgba(79,184,196,.07); pointer-events:none;
+}
+.map-marquee.naming { pointer-events:auto; }
+.map-frame-input { position:absolute; left:4px; top:4px; min-width:140px; }
+
+/* secretary frame-suggest chip (✓ frame / ✕), floated over the proposed cluster */
+.map-suggests { position:absolute; inset:0; z-index:7; pointer-events:none; }
+.map-suggest-chip {
+  position:absolute; transform:translate(-50%,-100%); display:flex; align-items:center; gap:7px;
+  background:var(--ink-2); border:1px solid var(--review); border-top:2px solid var(--review);
+  padding:5px 9px; pointer-events:auto; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.map-suggest-lead { color:var(--review); letter-spacing:.14em; }
+.map-suggest-label { font-family:var(--f-mono); font-size:11px; color:var(--paper-dim); }
+.map-suggest-chip button {
+  flex:none; background:transparent; border:1px solid var(--ink-line); cursor:pointer;
+  font-family:var(--f-tech); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:3px 6px; color:var(--paper-mute);
+}
+.map-suggest-ok:hover { color:var(--green-bright); border-color:var(--green); }
+.map-suggest-no:hover { color:var(--red); border-color:var(--red-deep); }
+
+/* S1: secretary relay-suggest chip (✓ route / ✕), floated at the from→to midpoint.
+   Same bracketed-mono / axis-aligned language as the frame-suggest chip; the lead
+   + border are tinted by relation type (set inline via relColor()). */
+.map-relay-chip {
+  position:absolute; transform:translate(-50%,-100%); display:flex; align-items:center; gap:7px;
+  background:var(--ink-2); border:1px solid var(--feed); border-top-width:2px;
+  padding:5px 9px; pointer-events:auto; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.map-relay-lead { letter-spacing:.14em; }
+.map-relay-label { font-family:var(--f-mono); font-size:11px; color:var(--paper-dim); }
+.map-relay-chip button {
+  flex:none; background:transparent; border:1px solid var(--ink-line); cursor:pointer;
+  font-family:var(--f-tech); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:3px 6px; color:var(--paper-mute);
+}
+.map-relay-ok:hover { color:var(--green-bright); border-color:var(--green); }
+.map-relay-no:hover { color:var(--red); border-color:var(--red-deep); }
+
+/* HUD canvas tools (arrange back to lanes / arm a group frame) */
+.map-hud-tools { display:flex; align-items:center; gap:7px; flex:none; }
+.map-tool {
+  font-family:var(--f-tech); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+  padding:5px 10px; border:1px solid var(--ink-line); color:var(--paper-mute);
+  background:transparent; cursor:pointer;
+}
+.map-tool:hover { color:var(--paper); border-color:var(--paper-fade); }
+.map-view.framing #map-frame { color:var(--feed); border-color:var(--feed); } /* armed */
+
+/* Slice 4: notes layer — collapsed pin, expands on hover/focus (selective surfacing) */
+.map-notes { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+.map-note { position: absolute; transform: translate(-50%, -120%); pointer-events: auto; }
+.map-note-pin {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  font-size: 11px; color: var(--paper-fade); background: var(--ink-2); border: 1px solid var(--ink-line); cursor: default;
+}
+.map-note.mine .map-note-pin { color: var(--warm, #E8674A); border-color: var(--warm, #E8674A); }
+.map-note.its  .map-note-pin { color: var(--feed); border-color: var(--feed); }
+.map-note-body {
+  display: none; position: absolute; left: 0; bottom: 100%; min-width: 150px; max-width: 240px;
+  padding: 7px 9px; background: var(--ink-2); border: 1px solid var(--ink-line);
+  border-left: 2px solid var(--warm, #E8674A); font-family: var(--f-sans, inherit); font-size: 12px; color: var(--paper);
+}
+.map-note.its .map-note-body { border-left-color: var(--feed); }
+.map-note:hover .map-note-body, .map-note.open .map-note-body { display: block; } /* surface on hover OR when its node is focused */
+.map-note-text { white-space: pre-wrap; }
+.map-note-del { float: right; margin-left: 8px; background: none; border: none; color: var(--paper-fade); cursor: pointer; }
+.map-note-del:hover { color: var(--red); }
+

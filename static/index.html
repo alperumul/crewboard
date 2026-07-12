@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>claude-hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&family=Martian+Mono:wght@400;500;600&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ============ MASTHEAD ============ -->
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-name">claude<span class="brand-dot">&#183;</span>hub</span>
+    </div>
+    <span class="eyebrow masthead-tag" id="masthead-tag">Reading Room</span>
+    <span class="masthead-lede" id="masthead-lede">Every session on a grouped rail; focus one and read it like correspondence &#8212; the advisor consults from the right.</span>
+
+    <!-- Map controls live in the masthead (shown only on Map via body.on-map) so the
+         Switchboard needs no second bar. The tag already reads "Switchboard" here. -->
+    <div class="masthead-map map-only" id="masthead-map">
+      <div class="map-hud-tools">
+        <button class="map-tool" id="map-autoarrange" title="tidy tiles back to workstream lanes">&#8983; arrange</button>
+        <button class="map-tool" id="map-frame" title="drag a labeled group frame">&#11034; frame</button>
+        <button class="map-tool" id="map-mode" title="secretary mode &#8212; Full runs cross-session triage/relay/frame; Quiet skips it to save cost">&#9681; full</button>
+        <button class="map-tool" id="map-reset" title="reset pan/zoom to home view">&#8982; home</button>
+      </div>
+      <div class="map-hud-legend">
+        <span class="eyebrow leg"><span class="leg-wire solid"></span>confirmed</span>
+        <span class="eyebrow leg"><span class="leg-wire dashed"></span>inferred</span>
+      </div>
+      <div class="map-hud-slot" id="map-hud-slot" title="Session / Weekly / Reset budget &#8212; arrives in S3">
+        <span class="eyebrow">&#9719; session</span><span class="eyebrow">weekly</span><span class="eyebrow">reset</span>
+      </div>
+    </div>
+
+    <!-- view toggle: one app, two views (Rail = S1, Map = S2) -->
+    <div class="view-toggle">
+      <button class="vbtn on" id="view-rail">&#9636; Rail</button>
+      <button class="vbtn" id="view-map" title="Switchboard &#8212; relations map">&#9671; Map</button>
+    </div>
+
+    <!-- live tally + connection -->
+    <div class="masthead-stat" id="tally">
+      <span class="dot bg-run live"></span><span id="tally-text">&#8212;</span>
+    </div>
+    <span id="conn" class="conn" title="hub connection"></span>
+    <!-- S3: global subscription near-limit warning (hidden until rate_limit_event fires at the warning line) -->
+    <span class="quota-warn hidden" id="quota-warn" title="subscription near limit"></span>
+  </header>
+
+  <div class="frame">
+
+    <!-- ============ LEFT RAIL : grouped sessions ============ -->
+    <aside class="rail-left">
+      <div class="rail-left-head">
+        <span class="eyebrow" style="letter-spacing:.22em">Sessions</span>
+        <button class="rail-new" id="new-session" title="launch a new session">+ NEW</button>
+      </div>
+      <div class="rail-left-list" id="session-rail">
+        <p class="rail-left-empty">no sessions yet &#8212; <span class="lk">+ NEW</span> to launch one.</p>
+      </div>
+    </aside>
+
+    <!-- ============ CENTER : situation + focused reading column ============ -->
+    <main class="center">
+
+      <!-- situation strip (sharp chips, not pills) -->
+      <div class="situation">
+        <span class="eyebrow" style="letter-spacing:.22em;flex:none">Situation</span>
+        <div class="situation-chips" id="situation"></div>
+      </div>
+
+      <!-- focused reading column -->
+      <div class="focus">
+
+        <!-- placeholder before any session is focused -->
+        <div class="focus-empty" id="focus-empty">
+          <div class="focus-empty-inner">
+            <span class="eyebrow">No session focused</span>
+            <p>Pick a session from the rail to read it like correspondence, or launch a new one.</p>
+          </div>
+        </div>
+
+        <!-- focused session header -->
+        <div class="focus-head hidden" id="focus-head">
+          <span class="dot bg-run live" id="focus-dot"></span>
+          <span class="eyebrow" id="focus-group" style="color:var(--red)"></span>
+          <h1 class="focus-name" id="focus-name"></h1>
+          <span class="tag st-run" id="focus-state">&#9655; run</span>
+          <span class="focus-meta" id="focus-meta"></span>
+          <!-- S3: per-session context fuel-gauge (reddens toward the auto-compact line) -->
+          <span class="ctx-gauge hidden" id="ctx-gauge" title="context window fill">
+            <span class="ctx-bar"><i class="ctx-fill" id="ctx-fill"></i><i class="ctx-compact" id="ctx-compact"></i></span>
+            <span class="ctx-label eyebrow" id="ctx-label"></span>
+          </span>
+          <button class="fork-btn hidden" id="fork-btn" title="fork with handoff — retire this near-full session and continue in a fresh one (same tile, same relations)">↪ fork</button>
+          <button class="route-btn" id="route-btn">&#8644; route output &#8594;</button>
+        </div>
+
+        <!-- inline route picker (toggled by the route button). S6: a confirm step that
+             shows the verbatim body the target will receive (server-resolved) + an OPT-IN,
+             human-authored framing section (empty by default). Only `section` is sent —
+             never a client `text` override, and no hub provenance enters the payload. -->
+        <div class="route-bar hidden" id="route-bar">
+          <div class="route-row">
+            <span class="eyebrow">route last reply to</span>
+            <select id="route-target"></select>
+          </div>
+          <div class="route-verbatim eyebrow">delivered verbatim — the target receives this exactly, server-resolved</div>
+          <pre class="route-preview" id="route-preview"></pre>
+          <label class="route-section-label eyebrow" for="route-section">add framing (optional) — you write it; sent before the verbatim text</label>
+          <textarea class="route-section" id="route-section" rows="2" placeholder="optional note to the target…"></textarea>
+          <div class="route-row route-actions">
+            <button id="route-send">route &#8594;</button>
+            <button class="route-cancel" id="route-cancel">cancel</button>
+          </div>
+        </div>
+
+        <!-- launch form (shown for + NEW) -->
+        <form class="launch hidden" id="launch-form" autocomplete="off">
+          <div class="launch-eyebrow"><span class="eyebrow">New session</span></div>
+          <div class="launch-row">
+            <input type="text" id="launch-name" placeholder="name (e.g. jwt-rotation)" />
+            <input type="text" id="launch-cwd" placeholder="cwd (blank = hub default)" />
+            <select id="launch-model" title="model for this session (default = CLI/account model)">
+              <option value="">model: default</option>
+              <option value="opus">opus</option>
+              <option value="sonnet">sonnet</option>
+              <option value="haiku">haiku</option>
+            </select>
+          </div>
+          <textarea id="launch-prompt" rows="3" placeholder="initial task prompt&#8230;"></textarea>
+          <div class="launch-actions">
+            <button type="submit" class="launch-go">launch session</button>
+            <button type="button" class="launch-cancel" id="launch-cancel">cancel</button>
+          </div>
+        </form>
+
+        <!-- the correspondence thread -->
+        <div class="thread hidden" id="thread"></div>
+
+        <!-- reply box for the focused session -->
+        <form class="reply hidden" id="reply-form" autocomplete="off">
+          <span class="reply-prompt">&#8250;</span>
+          <input type="text" id="reply-input" placeholder="Reply to this session, or steer it&#8230;" disabled />
+          <button type="submit" id="reply-send" class="reply-send" disabled>&#9166; send</button>
+        </form>
+      </div>
+    </main>
+
+    <!-- ============ RIGHT : advisor terminal ============ -->
+    <aside class="dock">
+      <div class="dock-head">
+        <span class="dock-mark"></span>
+        <span class="eyebrow" style="letter-spacing:.22em;color:var(--red)">Advisor</span>
+        <span class="eyebrow dock-scope">secretary &#183; all sessions</span>
+        <button class="dock-clear" id="advisor-clear" title="restart chat">&#8635;</button>
+      </div>
+
+      <div class="dock-chat" id="advisor-chat"></div>
+
+      <!-- approval rider (Bureau-stamp) — populated from the focused session's SSE -->
+      <div class="rider-slot" id="approval-rider"></div>
+
+      <form class="dock-input" id="advisor-form" autocomplete="off">
+        <span class="dock-prompt">&#8250;</span>
+        <input type="text" id="advisor-q" placeholder="ask the advisor&#8230;" />
+        <button id="advisor-go" type="submit" title="send">&#8593;</button>
+      </form>
+    </aside>
+
+  </div>
+
+  <!-- ============ MAP VIEW : Switchboard (Concept 4A) — S2 ============ -->
+  <section class="map-view hidden" id="map-view">
+
+    <!-- blueprint grid -->
+    <div class="map-blueprint"></div>
+
+    <!-- situation HUD moved into the masthead (body.on-map) — no second bar -->
+
+    <!-- stage: group-frames + orthogonal SVG edges UNDER the monitor tiles -->
+    <div class="map-stage" id="map-stage">
+      <!-- F-COORD: the single transformed world group — every positioned Map layer lives here -->
+      <div class="map-world" id="map-world">
+        <div class="map-frames" id="map-frames"></div>
+        <svg class="map-edges" id="map-edges" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+        <div class="map-lanes" id="map-lanes"></div>
+        <div class="map-nodes" id="map-nodes"></div>
+        <div class="map-labels" id="map-labels"></div>
+        <div class="map-suggests" id="map-suggests"></div>
+        <div class="map-notes" id="map-world-notes"></div>
+      </div>
+    </div>
+
+    <!-- floating advisor console (mirrors the Rail advisor; ask from the field) -->
+    <div class="map-console" id="map-console">
+      <div class="map-console-head">
+        <span class="dock-mark"></span>
+        <span class="eyebrow" style="color:var(--red);letter-spacing:.22em">Advisor</span>
+        <span class="eyebrow map-console-scope">secretary &#183; all sessions</span>
+        <span class="eyebrow" style="margin-left:auto">click a node &#8594; opens in Rail</span>
+      </div>
+      <div class="map-console-body" id="map-console-body">
+        <span class="dock-empty">Ask across the field, or click a node to read it in the Rail.</span>
+      </div>
+      <form class="map-console-input" id="map-advisor-form" autocomplete="off">
+        <span class="dock-prompt">&#8250;</span>
+        <input type="text" id="map-advisor-q" placeholder="ask the advisor&#8230;" />
+        <button type="submit" title="send">&#8593;</button>
+      </form>
+    </div>
+
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

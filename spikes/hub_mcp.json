@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hub": {
+      "command": "D:\\Downloads\\claude-hub\\.venv\\Scripts\\python.exe",
+      "args": ["D:\\Downloads\\claude-hub\\spikes\\mcp_perm_server.py"]
+    }
+  }
+}

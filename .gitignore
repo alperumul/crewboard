@@ -1,0 +1,41 @@
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Runtime / local state (can embed other projects' data — never publish) ---
+state.json
+state.json.*
+run/
+.hub_cwd
+
+# --- Manual rollback snapshots (this repo isn't under git; see CLAUDE.md) ---
+*-backup
+*-backup.*
+*terminal-backup*
+
+# --- Spike scratch / raw transcripts ---
+spikes/*_log.txt
+spikes/*_raw.jsonl
+spikes/sse_capture.txt
+spikes/_*.txt
+
+# --- Archives / scratch ---
+*.zip
+
+# explicit: stray backup with trailing extension
+static/style.terminal-backup.css
+
+# Windows/macOS folder junk
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Internal development docs & agent tooling (kept local, never published)
+.agents/
+.claude/
+docs/
+design/
+PLAN.md
+CLAUDE.md
+AGENTS.md
