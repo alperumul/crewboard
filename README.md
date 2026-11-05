@@ -1,5 +1,7 @@
 # CrewBoard
 
+> **This is the July 2026 release.** I'm rebuilding CrewBoard to run Claude Code and Codex side by side, in real terminals, with a new design. The rebuild is on a local branch and not released yet, so nothing below describes it. What it's becoming and where it stands: [aumul.com](https://aumul.com).
+
 **A local web board that runs many headless AI-agent sessions at once and routes
 work between them through a central "secretary" — so you stop being the
 copy-paste relay.**
